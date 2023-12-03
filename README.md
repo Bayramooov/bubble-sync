@@ -1,5 +1,5 @@
 # Bubble-sync
-Simple canvas experiment exploring tab synchronization through LocalStorage. Enjoy the synchronized movement of bubbles across tabs. A playful journey into web development skills.
+[Visit](https://bayramooov.github.io/bubble-sync/) the simple canvas experiment exploring tab synchronization through LocalStorage. Enjoy the synchronized movement of bubbles across tabs. A playful journey into web development skills.
 
 ### Environment Management
 
