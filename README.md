@@ -1,6 +1,8 @@
 # Bubble-sync
 [Visit](https://bayramooov.github.io/bubble-sync/) the simple canvas experiment exploring tab synchronization through LocalStorage. Enjoy the synchronized movement of bubbles across tabs. A playful journey into web development skills.
 
+![](https://github.com/Bayramooov/bubble-sync/assets/48291004/27b78e02-ddea-48da-a704-8ca5dfdb2ba1)
+
 ### Environment Management
 
 - The project utilizes LocalStorage to save and load the environment state, ensuring data persistence.
