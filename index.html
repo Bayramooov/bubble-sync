@@ -1,0 +1,320 @@
+<!--
+  Author: Sardor Bayramov
+  Date: 03.12.2023
+  Repository: https://github.com/Bayramooov/bubble-sync
+  Purpose:
+    This project was created to learn and practice how to make browser tabs work
+    together using something called LocalStorage. The main goal is to get better at
+    general web development, especially focusing on making tabs sync up and figuring
+    out the coordinates of the tabs inside the screen.
+-->
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset='utf-8'>
+  <meta http-equiv='X-UA-Compatible' content='IE=edge'>
+  <title>Bubble</title>
+  <meta name='viewport' content='width=device-width, initial-scale=1'>
+</head>
+<style>
+  body {
+    padding: 0;
+    margin: 0;
+    background-color: #2a323f;
+    overflow: hidden;
+  }
+  canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: -1;
+  }
+  .info {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    width: 250px;
+    height: 100px;
+    z-index: 100;
+    font-family: helvetica;
+    line-height: 1.7em;
+    color: rgb(140, 154, 206);
+  }
+  .info .btn:hover {
+    text-decoration: underline;
+    cursor: pointer;
+  }
+</style>
+<body>
+  <div class="info">
+    <div id="fps">fps:</div>
+    <div id="x"></div>
+    <div id="y"></div>
+    <div id="tabs"></div>
+    <span class="btn" id="clear">clear</span>
+  </div>
+  <canvas></canvas>
+</body>
+<script>
+  class Bubble {
+    /**
+     * Constructor for the Bubble class.
+     * @param {Object} bubble - Options for creating the Bubble.
+     * @param {number} [bubble.x=innerWidth/2] - Initial X-coordinate of the bubble's center.
+     * @param {number} [bubble.y=innerHeight/2] - Initial Y-coordinate of the bubble's center.
+     * @param {number} [bubble.radius=50] - Initial radius of the bubble.
+     * @param {number} [bubble.speedX=1.5] - Speed along the X-axis (change in X-coordinate per frame).
+     * @param {number} [bubble.speedY=1.5] - Speed along the Y-axis (change in Y-coordinate per frame).
+     * @param {string} [bubble.color=randomColor()] - Color of the bubble.
+     */
+    constructor(bubble) {
+      this.x = bubble.x ?? window.innerWidth / 2 + window.screenX;
+      this.y = bubble.y ?? window.innerHeight / 2 + window.screenY;
+      this.radius = bubble.radius ?? 50;
+      this.speedX = bubble.speedX ?? 1.5;
+      this.speedY = bubble.speedY ?? 1.5;
+      this.color = bubble.color ?? Bubble.randomColor();
+    }
+
+    /**
+     * Generate a random pleasant color that complements the background. (independent)
+     * @returns {string} - Random color in hex format.
+     */
+    static randomColor() {
+      const backgroundHue = Math.floor(Math.random() * 360); // Random hue
+      const saturation = Math.floor(Math.random() * 30) + 70; // Adjust saturation for pleasant colors
+      const lightness = Math.floor(Math.random() * 20) + 30; // Adjust lightness for pleasant colors
+      return `hsl(${backgroundHue}, ${saturation}%, ${lightness}%)`;
+    }
+
+    /**
+     * Handle collisions with screen edges. (independent)
+     * @param {Object} env - Environment object containing screen boundaries.
+     */
+    handleCollisions(screenBounds) {
+      if (this.x - this.radius <= screenBounds.minX && this.speedX < 0) {
+        this.x = screenBounds.minX + this.radius;
+        this.speedX = -this.speedX;
+      } else if (this.x + this.radius >= screenBounds.maxX && this.speedX > 0) {
+        this.x = screenBounds.maxX - this.radius;
+        this.speedX = -this.speedX;
+      }
+      if (this.y - this.radius <= screenBounds.minY && this.speedY < 0) {
+        this.y = screenBounds.minY + this.radius;
+        this.speedY = -this.speedY;
+      } else if (this.y + this.radius >= screenBounds.maxY && this.speedY > 0) {
+        this.y = screenBounds.maxY - this.radius;
+        this.speedY = -this.speedY;
+      }
+    }
+
+    /**
+     * Update the bubble's position and handle collisions. (independent)
+     * @param {Object} env - Environment object containing screen boundaries and canvas context.
+     */
+    update(env) {
+      // Handling bubble collisions with screen edges
+      this.handleCollisions(env.screenBounds);
+      // Update bubble position based on velocity
+      this.x += this.speedX;
+      this.y += this.speedY;
+    }
+
+    /**
+     * Render the bubble on the canvas. (independent)
+     * @param {CanvasRenderingContext2D} ctx - The canvas rendering context.
+     */
+    render(ctx) {
+      // Converting global coordinates into local tab
+      const localX = this.x - window.screenX;
+      const localY = this.y - window.screenY;
+      // rendering bubble on the canvas context 2D
+      ctx.beginPath();
+      ctx.arc(localX, localY, this.radius, 0, Math.PI * 2);
+      ctx.fillStyle = this.color;
+      ctx.fill();
+      ctx.strokeStyle = this.color;
+      ctx.stroke();
+    }
+  }
+
+  /**
+   * Generates a new Bubble with random speeds and default x, y coordinates. (independent)
+   * @returns {Bubble} A new Bubble object.
+   */
+  function bubbleFactory() {
+    // Generate random speed for X and Y directions
+    const speedX = (Math.random() - 0.5) * 2 * (5 - 4) + 4;
+    const speedY = (Math.random() - 0.5) * 2 * (2 - 0) + 0;
+    // Create and return a new Bubble with default coordinates, radius 75, and random speeds
+    return new Bubble({ radius: 75, speedX, speedY });
+  }
+
+  /**
+   * Generate a unique string combining timestamp and random characters. (independent)
+   * @returns {string} A unique string.
+   */
+  function uniqueString() {
+    const timestamp = Date.now().toString(36);
+    const randomStr = Math.random().toString(36).substring(2, 8);
+    // Combine timestamp and random string to create a unique identifier
+    return `${timestamp}${randomStr}`;
+  }
+
+  /**
+   * Resize the canvas element to match the current window dimensions. (independent)
+   * @param {HTMLCanvasElement} canvas - The canvas element to resize.
+   */
+  function canvasFullScreen(canvas) {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+
+  /**
+   * Save the environment state to localStorage after converting Bubble objects to plain data. (independent)
+   * @param {Object} env - The environment object containing Bubble objects and screen dimentions.
+   */
+  function saveEnv(env) {
+    localStorage.setItem('canvas_env', JSON.stringify(env));
+  }
+
+  /**
+   * Load the environment state from localStorage, initializing defaults if needed. (independent)
+   * @returns {Object} The loaded or newly created environment object.
+   */
+  function loadEnv(tabId) {
+    // Try to parse the environment from localStorage, or initialize with default values
+    const env = JSON.parse(localStorage.getItem('canvas_env')) || {
+      bubbles: [],
+      screenBounds: {
+        minX: window.screenX,
+        minY: window.screenY,
+        maxX: window.screenX + window.innerWidth,
+        maxY: window.screenY + window.innerHeight,
+      },
+      tabs: {},
+      tabCount: 0,
+    };
+    // Convert Bubble objects in array to instances of Bubble
+    env.bubbles = env.bubbles.map(bubble => new Bubble(bubble));
+    // Update the current tab's screen boundaries
+    env.tabs[tabId] = {
+      minScreenX: window.screenX,
+      minScreenY: window.screenY,
+      maxScreenX: window.screenX + window.innerWidth,
+      maxScreenY: window.screenY + window.innerHeight,
+    };
+    // Update overall screen boundaries based on all tabs
+    const tabKeys = Object.keys(env.tabs);
+    env.screenBounds.minX = Math.min(...tabKeys.map(tab => env.tabs[tab].minScreenX));
+    env.screenBounds.minY = Math.min(...tabKeys.map(tab => env.tabs[tab].minScreenY));
+    env.screenBounds.maxX = Math.max(...tabKeys.map(tab => env.tabs[tab].maxScreenX));
+    env.screenBounds.maxY = Math.max(...tabKeys.map(tab => env.tabs[tab].maxScreenY));
+    // Return the loaded or newly created environment object
+    return env;
+  }
+
+  /**
+   * Clear the environment state from localStorage.
+   * dependent: animationId
+   */
+  function clearEnv() {
+    stopAnimation();
+    localStorage.removeItem('canvas_env');
+  }
+
+  /**
+   * Update HTML elements with environment data for logging.
+   * dependent: lastFrameTime, deltaTimeSum
+   * @param {Object} env - The environment data to display.
+   */
+  function logInfo(env) {
+    // Calculate fps
+    const currentTime = performance.now();
+    const deltaTime = currentTime - lastFrameTime;
+    const fps = Math.round(1000 / deltaTime);
+    // Update fps if a second has passed
+    deltaTimeSum += deltaTime;
+    if (deltaTimeSum >= 1000) {
+      document.querySelector('#fps').innerText = `fps: ${fps}`;
+      deltaTimeSum = 0;
+    }
+    lastFrameTime = currentTime;
+    // Update elements with environment data
+    document.querySelector('#x').innerText = `screen vw: ${env.screenBounds.minX} px - ${env.screenBounds.maxX} px`;
+    document.querySelector('#y').innerText = `screen vh: ${env.screenBounds.minY} px - ${env.screenBounds.maxY} px`;
+    document.querySelector('#tabs').innerText = `tabs: ${env.tabCount}`;
+  }
+
+  /**
+   * Stops the Animation.
+   * dependent: animationId, ctx
+   */
+  function stopAnimation() {
+    (window.cancelAnimationFrame || window.mozCancelAnimationFrame)(animationId);
+    ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+  }
+
+  /**
+   * Animates the bubbles on the canvas, updating their positions and rendering.
+   * dependent: ctx
+   */
+  function animate() {
+    // Load the environment data for the current tab
+    const env = loadEnv(tabId);
+    // Clear the entire canvas
+    ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+    // Update and render each bubble in the environment
+    env.bubbles.forEach(bubble => {
+      bubble.update(env);
+      bubble.render(ctx);
+    });
+    // Save the updated environment data to localStorage
+    saveEnv(env);
+    // Log relevant information about the environment
+    logInfo(env);
+    // Request the next animation frame
+    animationId = window.requestAnimationFrame(animate);
+  }
+
+  // Get the canvas and its 2D rendering context
+  const canvas = document.querySelector('canvas');
+  const ctx = canvas.getContext('2d');
+
+  // Generate a unique identifier for the current tab
+  const tabId = uniqueString();
+
+  // Initialize variables for tracking time in animation frames
+  let lastFrameTime = performance.now();
+  let deltaTimeSum = 0;
+  let animationId;
+
+  // Event listeners for window actions
+  document.querySelector('#clear').addEventListener('click', clearEnv);
+  window.addEventListener('resize', () => canvasFullScreen(canvas));
+  window.addEventListener('beforeunload', () => {
+    window.cancelAnimationFrame(animationId);
+    const env = loadEnv(tabId);
+    delete env.tabs[tabId];
+    env.tabCount--;
+    if (env.tabCount < 1) clearEnv();
+    else saveEnv(env);
+  });
+
+  // Make the canvas full screen
+  canvasFullScreen(canvas);
+
+  // Load or initialize the environment for the current tab
+  let env = loadEnv(tabId);
+
+  // Increment the tab count and add a new bubble to the environment
+  env.tabCount++;
+  env.bubbles.push(bubbleFactory());
+
+  // Save the updated environment to localStorage
+  saveEnv(env);
+
+  // Start the animation loop
+  animate();
+</script>
+</html>
